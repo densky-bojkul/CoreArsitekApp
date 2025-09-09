@@ -6,9 +6,8 @@ on:
   pull_request:
     branches: [ "main" ]
 
-# 🔑 beri izin ke GITHUB_TOKEN untuk push commit wrapper
 permissions:
-  contents: write
+  contents: write   # biar bisa commit wrapper kalau perlu
 
 jobs:
   build:
@@ -33,36 +32,35 @@ jobs:
         with:
           gradle-version: 8.4
 
-      # Generate wrapper kalau belum ada
-      - name: Generate Wrapper (Gradle 8.4)
+      # 🔧 Pastikan wrapper lengkap (regenerate kalau kurang file .jar)
+      - name: Ensure Gradle Wrapper Complete
         run: |
-          if [ ! -f "./gradlew" ]; then
-            gradle wrapper --gradle-version 8.4
-          fi
+          rm -rf gradle/wrapper
+          gradle wrapper --gradle-version 8.4
 
-      # Commit wrapper ke repo
+      # Optional: commit wrapper ke repo biar permanen
       - name: Commit Gradle Wrapper
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.properties
-            git commit -m "Add Gradle Wrapper 8.4"
+            git add gradlew gradlew.bat gradle/wrapper/
+            git commit -m "Add complete Gradle Wrapper 8.4"
             git push
           fi
 
-      # Decode keystore dari secrets
+      # 🔑 Decode keystore dari secrets
       - name: Decode Keystore
         run: |
           echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > corearsitek-key.jks
 
-      # Build release APK pakai wrapper
+      # 🚀 Build release APK
       - name: Build Release APK
         run: |
           chmod +x ./gradlew
           ./gradlew clean assembleRelease
 
-      # Upload hasil build
+      # 📦 Upload hasil build
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
