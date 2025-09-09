@@ -2,52 +2,45 @@ name: Android CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout sources
+      # 1. Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Setup JDK 17
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
+      # 3. Decode keystore dari secrets
       - name: Decode Keystore
         run: |
-          echo "$SIGNING_KEYSTORE" | base64 --decode > corearsitek-key.jks
-        env:
-          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > corearsitek-key.jks
 
-      - name: Set Gradle permissions
-        run: chmod +x ./gradlew
-
-      - name: Build Release APK & AAB
+      # 4. Build project
+      - name: Build Release APK
         run: |
-          ./gradlew clean
-          ./gradlew assembleRelease
-          ./gradlew bundleRelease
-        env:
-          MYAPP_UPLOAD_STORE_FILE: corearsitek-key.jks
-          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew clean assembleRelease
+          else
+            gradle clean assembleRelease
+          fi
 
+      # 5. Upload artifact (APK/AAB)
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-
-      - name: Upload Release AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-aab
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
