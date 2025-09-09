@@ -6,63 +6,74 @@ on:
   pull_request:
     branches: [ "main" ]
 
-permissions:
-  contents: write   # biar bisa commit wrapper kalau perlu
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # biar bisa auto-commit gradlew
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Tambahkan .gitignore supaya .gradle & build tidak ikut ke-commit
+      - name: Ensure .gitignore exists
+        run: |
+          if [ ! -f .gitignore ]; then
+            echo ".gradle/" >> .gitignore
+            echo "build/" >> .gitignore
+            echo "local.properties" >> .gitignore
+            echo "*.iml" >> .gitignore
+            echo ".idea/" >> .gitignore
+          fi
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
 
-      # 🔧 Setup Gradle versi kompatibel dengan AGP
-      - name: Set up Gradle 8.4
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.4
-
-      # 🔧 Pastikan wrapper lengkap (regenerate kalau kurang file .jar)
-      - name: Ensure Gradle Wrapper Complete
+      # Generate gradle wrapper jika belum ada
+      - name: Ensure Gradle Wrapper
         run: |
-          rm -rf gradle/wrapper
-          gradle wrapper --gradle-version 8.4
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle wrapper not found, generating..."
+            gradle wrapper --gradle-version 8.4
+          fi
 
-      # Optional: commit wrapper ke repo biar permanen
-      - name: Commit Gradle Wrapper
+      # Commit wrapper jika baru dibuat
+      - name: Commit Gradle Wrapper if missing
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gradlew gradlew.bat gradle/wrapper/
-            git commit -m "Add complete Gradle Wrapper 8.4"
+            git add gradlew gradlew.bat gradle/wrapper/ .gitignore
+            git commit -m "Add Gradle Wrapper 8.4"
             git push
+          else
+            echo "No Gradle Wrapper changes to commit"
           fi
 
-      # 🔑 Decode keystore dari secrets
-      - name: Decode Keystore
+      # Restore keystore dari secret
+      - name: Decode keystore
         run: |
           echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > corearsitek-key.jks
 
-      # 🚀 Build release APK
-      - name: Build Release APK
-        run: |
-          chmod +x ./gradlew
-          ./gradlew clean assembleRelease
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
 
-      # 📦 Upload hasil build
+      # Build release APK
+      - name: Build Release APK
+        run: ./gradlew clean assembleRelease
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+      # Upload hasil build
       - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: app-release
+          name: release-apk
           path: app/build/outputs/apk/release/*.apk
