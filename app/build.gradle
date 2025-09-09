@@ -1,21 +1,25 @@
+plugins {
+    id 'com.android.application'
+}
+
 android {
     namespace "com.nunucore.corearsitek"
-    compileSdk 34
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.nunucore.corearsitek"
         minSdk 21
-        targetSdk 34
+        targetSdk 33
         versionCode 1
         versionName "1.0"
     }
 
     signingConfigs {
         release {
-            storeFile file("corearsitek-key.jks")
-            storePassword System.getenv("SIGNING_STORE_PASSWORD") ?: ""
-            keyAlias System.getenv("SIGNING_KEY_ALIAS") ?: ""
-            keyPassword System.getenv("SIGNING_KEY_PASSWORD") ?: ""
+            storeFile file(MYAPP_UPLOAD_STORE_FILE)
+            storePassword MYAPP_UPLOAD_STORE_PASSWORD
+            keyAlias MYAPP_UPLOAD_KEY_ALIAS
+            keyPassword MYAPP_UPLOAD_KEY_PASSWORD
         }
     }
 
@@ -25,6 +29,12 @@ android {
             minifyEnabled false
             shrinkResources false
             debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
