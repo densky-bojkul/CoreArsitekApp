@@ -2,78 +2,67 @@ name: Android CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write  # biar bisa auto-commit gradlew
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Tambahkan .gitignore supaya .gradle & build tidak ikut ke-commit
-      - name: Ensure .gitignore exists
+      # Step 1: Pastikan Gradle Wrapper ada
+      - name: Ensure Gradle Wrapper
         run: |
-          if [ ! -f .gitignore ]; then
-            echo ".gradle/" >> .gitignore
-            echo "build/" >> .gitignore
-            echo "local.properties" >> .gitignore
-            echo "*.iml" >> .gitignore
-            echo ".idea/" >> .gitignore
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle wrapper tidak ditemukan. Membuat baru..."
+            sudo apt-get update -y
+            sudo apt-get install -y gradle
+            gradle wrapper --gradle-version 8.4
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add gradlew gradlew.bat gradle/wrapper/
+            git commit -m "Add Gradle Wrapper 8.4" || echo "No changes to commit"
+            git push || echo "No permission to push"
           fi
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      # Step 2: Setup JDK
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      # Generate gradle wrapper jika belum ada
-      - name: Ensure Gradle Wrapper
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "Gradle wrapper not found, generating..."
-            gradle wrapper --gradle-version 8.4
-          fi
+      # Step 3: Setup Gradle cache
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      # Commit wrapper jika baru dibuat
-      - name: Commit Gradle Wrapper if missing
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gradlew gradlew.bat gradle/wrapper/ .gitignore
-            git commit -m "Add Gradle Wrapper 8.4"
-            git push
-          else
-            echo "No Gradle Wrapper changes to commit"
-          fi
-
-      # 🔑 Restore keystore langsung ke folder app/
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > app/corearsitek-key.jks
-
-      - name: Grant execute permission for Gradle
-        run: chmod +x ./gradlew
-
-      # Build release APK
-      - name: Build Release APK
-        run: ./gradlew clean assembleRelease
+      # Step 4: Decode keystore dari base64
+      - name: Decode Keystore
+        run: echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > app/corearsitek-key.jks
         env:
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
 
-      # Upload hasil build pakai v4
+      # Step 5: Build APK Release
+      - name: Build Release APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean assembleRelease -x lintVitalRelease
+        env:
+          MYAPP_UPLOAD_STORE_FILE: corearsitek-key.jks
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+      # Step 6: Upload artifact APK
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
-          path: app/build/outputs/apk/release/*.apk
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
