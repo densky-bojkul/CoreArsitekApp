@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -18,7 +19,6 @@ android {
 
     signingConfigs {
         release {
-            // File keystore hasil decode dari secrets
             storeFile file("$rootDir/app/corearsitek-key.jks")
             storePassword System.getenv("MYAPP_UPLOAD_STORE_PASSWORD")
             keyAlias System.getenv("MYAPP_UPLOAD_KEY_ALIAS")
@@ -34,7 +34,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            // bisa pakai signing debug default
+            // default debug keystore
         }
     }
 
