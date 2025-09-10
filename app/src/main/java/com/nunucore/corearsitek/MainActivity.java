@@ -1,38 +1,44 @@
 package com.nunucore.corearsitek;
 
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
+
+    private WebView webView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        WebView webView = findViewById(R.id.webview);
-        webView.getSettings().setJavaScriptEnabled(true);
+        webView = new WebView(this);
+        setContentView(webView);
 
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.startsWith("http://") || url.startsWith("https://")) {
-                    if (url.contains("corearsitek.id")) {
-                        view.loadUrl(url);
-                        return false;
-                    } else {
-                        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        startActivity(i);
-                        return true;
-                    }
-                }
-                return true;
-            }
-        });
+        // Konfigurasi WebView
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);      // Aktifkan JS
+        webSettings.setDomStorageEnabled(true);      // Aktifkan DOM Storage
+        webSettings.setUseWideViewPort(true);
+        webSettings.setLoadWithOverviewMode(true);
 
-        webView.loadUrl("https://corearsitek.id");
+        // Biar link tetap di app, bukan ke browser eksternal
+        webView.setWebViewClient(new WebViewClient());
+
+        // Load URL kamu
+        webView.loadUrl("https://corearsitek.id/");
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Kalau bisa back di WebView, jangan keluar dulu
+        if (webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
     }
 }
