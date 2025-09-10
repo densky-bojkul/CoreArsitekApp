@@ -1,4 +1,4 @@
-name: Android CI
+name: Android CI/CD
 
 on:
   push:
@@ -6,52 +6,52 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write   # biar bisa auto commit gradlew wrapper
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---- Gradle Wrapper auto-fix ----
-      - name: Ensure Gradle Wrapper exists
-        run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "Gradle Wrapper not found, generating..."
-            gradle wrapper --gradle-version 8.4
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gradlew gradlew.bat gradle/wrapper/
-            git commit -m "Add Gradle Wrapper 8.4" || echo "No changes to commit"
-            git push || echo "No changes to push"
-          fi
-
-      # ---- Setup JDK ----
+      # Setup JDK 17
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
 
-      # ---- Decode Keystore dari Secret ----
+      # Gradle cache
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # 🔑 Decode keystore dari secret
       - name: Decode Keystore
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/corearsitek-key.jks
+
+      # 🔧 Pastikan Gradle Wrapper ada (auto-fix kalau hilang)
+      - name: Ensure Gradle Wrapper
         run: |
-          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/corearsitek-key.jks
+          if [ ! -f "./gradlew" ]; then
+            echo "Gradle Wrapper not found, generating..."
+            gradle wrapper --gradle-version 8.4
+          fi
+          chmod +x ./gradlew
 
-      # ---- Build APK & AAB Release ----
+      # 🔨 Build Release APK
       - name: Build Release
-        run: ./gradlew clean assembleRelease bundleRelease
+        run: ./gradlew clean assembleRelease
+        env:
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
-      # ---- Upload Artifact ----
-      - name: Upload Release APK & AAB
+      # 📦 Upload artifact (APK)
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: CoreArsitekApp
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
+          name: CoreArsitekApp-Release
+          path: app/build/outputs/apk/release/app-release.apk
