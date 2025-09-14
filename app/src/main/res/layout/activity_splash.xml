@@ -7,9 +7,10 @@
 
     <ImageView
         android:id="@+id/splashLogo"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
-        android:src="@mipmap/ic_launcher"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@mipmap/corearsitek_splash"
+        android:scaleType="fitXY"
         android:layout_centerInParent="true"
         android:contentDescription="@string/app_name"/>
 </RelativeLayout>
